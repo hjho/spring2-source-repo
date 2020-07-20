@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.3.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.3.xsd">
+	
+<!-- 히카리시피 커넥션  -->
+	<bean id="hikariConfig" class="com.zaxxer.hikari.HikariConfig">
+		<property name="driverClassName">
+			<value>net.sf.log4jdbc.sql.jdbcapi.DriverSpy</value>
+		</property>
+		<property name="jdbcUrl">
+			<value>jdbc:log4jdbc:oracle:thin:@127.0.0.1:1521:orcl11</value>
+		</property>
+		<property name="autoCommit" value="false"/>
+		<property name="username">
+			<value>scott</value>
+		</property>
+		<property name="password">
+			<value>tiger</value>
+		</property>	
+	</bean>
+<!-- 히카리 DataSource -->
+	<bean id="dataSource" class="com.zaxxer.hikari.HikariDataSource" >
+		<constructor-arg ref="hikariConfig"/>
+	</bean>
+<!-- ojdbc 드라이버 설정 -->
+	<bean id="data-source-target" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+		<property name="driverClassName">
+			<value>oracle.jdbc.driver.OracleDriver</value>
+		</property>
+		<property name="url">
+			<value>jdbc:oracle:thin:@127.0.0.1:1521:orcl11</value>
+		</property>
+		<property name="username">
+			<value>scott</value>
+		</property>
+		<property name="password">
+			<value>tiger</value>
+		</property>
+	</bean>
+<!-- 트랜잭션 설정 -->
+	<bean id="txManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager"> 
+		<property name="dataSource" ref="dataSource"></property>
+	</bean>
+<!-- 트랜잭션 어드바이저 설정 -->
+	<tx:advice id="txAdvice" transaction-manager="txManager">
+		<tx:attributes>
+			<!-- <tx:method name="cud*" propagation="REQUIRED" rollback-for="DataAccessException"/>	 -->	
+			<tx:method name="*INS" propagation="REQUIRED" rollback-for="Exception"/>		
+			<!-- <tx:method name="do*"/>	 -->	
+		</tx:attributes>
+	</tx:advice>
+	
+<!-- 트랜잭션 어드바이저 컨피그 설정 -->
+	<bean id="txLog" class="transact.aution.LogAdvice"/>
+	<aop:config>
+		<aop:pointcut id="txPointcut" expression="execution(* transact.aution.*Logic.*(..))"/>
+		<aop:advisor pointcut-ref="txPointcut" advice-ref="txAdvice" />
+		<aop:aspect ref="txLog">
+			<aop:before pointcut-ref="txPointcut" method="printLog"/>
+		</aop:aspect>
+	</aop:config>
+<!-- SqlSessionFactory 인스턴스화 -->
+	<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="configLocation" value="WEB-INF/mybatis-config.xml"/>
+		<property name="dataSource" ref="dataSource"/>
+	</bean>
+<!-- SqlSessionTemplate 인스턴스화 -->	
+	<bean id="sqlSessionTemplate" class="org.mybatis.spring.SqlSessionTemplate">
+		<constructor-arg index="0" ref="sqlSessionFactory"/>
+	</bean>
+	
+<!-- 추가 bean 설정 하는 곳  -->
+<!-- board -->
+	<bean id="board-logic" class="mvc.board.BoardLogic">
+		<property name="boardDao" ref="board-dao"></property>
+	</bean>
+	<bean id="board-dao" class="mvc.board.BoardDao">
+		<property name="sqlSessionTemplate" ref="sqlSessionTemplate"></property>
+	</bean>
+	
+</beans>
